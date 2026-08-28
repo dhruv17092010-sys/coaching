@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ChalkQuiz · AI Quiz Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,500&family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="board-texture" aria-hidden="true"></div>
+
+<header class="site-header">
+  <div class="brand">
+    <span class="pin" aria-hidden="true"></span>
+    <h1>ChalkQuiz<span class="brand-dot">.</span></h1>
+  </div>
+  <nav class="top-nav">
+    <button class="nav-link" id="nav-home" data-active="true">New Quiz</button>
+    <button class="nav-link" id="nav-history">History</button>
+  </nav>
+</header>
+
+<main id="app">
+
+  <!-- ===================== SETUP SCREEN ===================== -->
+  <section id="screen-setup" class="screen">
+    <div class="hero">
+      <p class="eyebrow">chalk one up, grade instantly</p>
+      <h2 class="hero-title">Turn any topic into a quiz<br/>before the bell rings.</h2>
+      <p class="hero-sub">Pick a grade, a topic, a difficulty — the AI writes the questions, you write the answers.</p>
+    </div>
+
+    <form id="quiz-form" class="quiz-card setup-card">
+      <div class="field">
+        <label for="topic">Topic</label>
+        <input type="text" id="topic" name="topic" placeholder="e.g. Photosynthesis, World War II, Fractions" required maxlength="80" />
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="grade">Grade level</label>
+          <select id="grade" name="grade" required>
+            <option value="">Select grade</option>
+            <option>Grade 1</option><option>Grade 2</option><option>Grade 3</option>
+            <option>Grade 4</option><option>Grade 5</option><option>Grade 6</option>
+            <option>Grade 7</option><option>Grade 8</option><option>Grade 9</option>
+            <option>Grade 10</option><option>Grade 11</option><option>Grade 12</option>
+            <option>Undergraduate</option><option>Graduate</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="difficulty">Difficulty</label>
+          <select id="difficulty" name="difficulty" required>
+            <option value="Easy">Easy</option>
+            <option value="Medium" selected>Medium</option>
+            <option value="Hard">Hard</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Number of questions</label>
+        <div class="chip-group" id="question-count-group" role="radiogroup">
+          <button type="button" class="chip" data-value="5">5</button>
+          <button type="button" class="chip is-selected" data-value="10">10</button>
+          <button type="button" class="chip" data-value="15">15</button>
+          <button type="button" class="chip" data-value="20">20</button>
+        </div>
+        <input type="hidden" id="numQuestions" value="10" />
+      </div>
+
+      <div class="field">
+        <label class="timer-label">
+          <span>Timer</span>
+          <span class="toggle">
+            <input type="checkbox" id="timer-enabled" checked />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </span>
+        </label>
+        <div class="field-row" id="timer-input-row">
+          <input type="number" id="timer-minutes" min="1" max="120" value="10" />
+          <span class="timer-unit">minutes for the whole quiz</span>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary" id="generate-btn">
+        <span class="btn-label">Generate quiz</span>
+        <span class="chalk-underline" aria-hidden="true"></span>
+      </button>
+
+      <p class="form-error" id="form-error" hidden></p>
+    </form>
+  </section>
+
+  <!-- ===================== LOADING SCREEN ===================== -->
+  <section id="screen-loading" class="screen" hidden>
+    <div class="loading-wrap">
+      <div class="chalk-spinner" aria-hidden="true"></div>
+      <p class="loading-text" id="loading-text">Sharpening the chalk…</p>
+    </div>
+  </section>
+
+  <!-- ===================== QUIZ SCREEN ===================== -->
+  <section id="screen-quiz" class="screen" hidden>
+    <div class="quiz-topbar">
+      <div class="quiz-meta">
+        <span id="quiz-topic-label">Topic</span>
+        <span class="dot-sep">·</span>
+        <span id="quiz-progress-label">Question 1 of 10</span>
+      </div>
+      <div class="timer-chip" id="timer-chip" hidden>
+        <span class="timer-dot"></span>
+        <span id="timer-display">10:00</span>
+      </div>
+    </div>
+
+    <div class="progress-track" aria-hidden="true">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+
+    <div class="quiz-card question-card">
+      <p class="question-index" id="question-index">Q1</p>
+      <h3 class="question-text" id="question-text">Question text goes here</h3>
+      <div class="options-list" id="options-list"></div>
+    </div>
+
+    <div class="quiz-nav">
+      <button class="btn-ghost" id="prev-btn">Back</button>
+      <button class="btn-primary" id="next-btn">Next</button>
+    </div>
+  </section>
+
+  <!-- ===================== RESULTS SCREEN ===================== -->
+  <section id="screen-results" class="screen" hidden>
+    <div class="results-header">
+      <p class="eyebrow">report card</p>
+      <h2 class="hero-title" id="results-title">Nice work!</h2>
+      <div class="score-ring-wrap">
+        <svg viewBox="0 0 140 140" class="score-ring">
+          <circle cx="70" cy="70" r="60" class="ring-bg" />
+          <circle cx="70" cy="70" r="60" class="ring-fill" id="ring-fill" />
+        </svg>
+        <div class="score-ring-label">
+          <span id="score-fraction">0/10</span>
+          <span id="score-percent">0%</span>
+        </div>
+      </div>
+      <p class="results-sub" id="results-sub">You answered 0 of 10 correctly in 0:00.</p>
+    </div>
+
+    <div class="results-actions">
+      <button class="btn-primary" id="retake-btn">New quiz</button>
+      <button class="btn-ghost" id="review-toggle-btn">Review answers</button>
+    </div>
+
+    <div class="review-list" id="review-list" hidden></div>
+  </section>
+
+  <!-- ===================== HISTORY SCREEN ===================== -->
+  <section id="screen-history" class="screen" hidden>
+    <div class="hero hero-compact">
+      <p class="eyebrow">past attempts</p>
+      <h2 class="hero-title">Your quiz history</h2>
+      <p class="hero-sub">Stored right on this device — nothing leaves your browser.</p>
+    </div>
+    <div class="history-list" id="history-list"></div>
+    <button class="btn-ghost btn-danger" id="clear-history-btn" hidden>Clear history</button>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <p>ChalkQuiz — questions generated by AI, so always double-check the tricky ones.</p>
+</footer>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
