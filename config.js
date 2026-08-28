@@ -10,8 +10,8 @@
 // SETUP.md, Step 3.
 // ============================================================
 
-const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR-SUPABASE-ANON-PUBLIC-KEY";
+const SUPABASE_URL = "https://wxcqxviocsyprmxzwnyl.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_QBiGef7ozcb4QeNJIx8rfg_g273NQOq";
 
 // Full URL of the deployed Edge Function that talks to Gemini.
 const GENERATE_QUIZ_ENDPOINT = `${SUPABASE_URL}/functions/v1/generate-quiz`;
