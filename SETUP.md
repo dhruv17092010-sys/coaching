@@ -42,19 +42,23 @@ Quiz **results** are saved with `localStorage` directly in the student's browser
 
 ---
 
-## Step 2 — Create a GitHub repository
+## Step 2 — Create a GitHub repository (using github.com, no terminal needed)
 
-1. Go to [https://github.com/new](https://github.com/new) and create a new repository (e.g. `chalkquiz`). Keep it public or private — either works with Netlify.
-2. On your computer, open a terminal in this project folder and push it:
+1. Go to [https://github.com/new](https://github.com/new) and create a new repository (e.g. `chalkquiz`). Keep it public or private — either works with Netlify. Do **not** initialize it with a README (you're uploading your own files).
+2. On the new repository's page, click **uploading an existing file** (or go to **Add file → Upload files**).
+3. From this project folder, drag in all the top-level files and folders:
+   - `index.html`
+   - `style.css`
+   - `app.js`
+   - `config.js`
+   - `netlify.toml`
+   - `.gitignore`
+   - `SETUP.md`
+   - the whole `supabase` folder (drag the folder itself — GitHub's uploader preserves the folder structure, so `supabase/functions/generate-quiz/index.ts` and `supabase/config.toml` will land in the right place)
 
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit: ChalkQuiz"
-   git branch -M main
-   git remote add origin https://github.com/YOUR-USERNAME/chalkquiz.git
-   git push -u origin main
-   ```
+   > Tip: if your browser lets you select multiple items at once (folder + files together), do it in one drag so everything uploads together. Otherwise, upload the files first, then drag in the `supabase` folder separately — GitHub will merge it into the existing repo.
+4. Scroll down, add a commit message like `Initial commit: ChalkQuiz`, and click **Commit changes**.
+5. Refresh the repository page and confirm you see all the files, including the nested `supabase/functions/generate-quiz/index.ts`.
 
 ---
 
@@ -67,12 +71,17 @@ Quiz **results** are saved with `localStorage` directly in the student's browser
 4. In the project dashboard, go to **Project Settings → API**. Copy:
    - **Project URL** (looks like `https://abcdefgh.supabase.co`)
    - **anon public** key (a long string starting with `eyJ...`)
-5. Open `config.js` in this project and paste them in:
+5. Open `config.js` — you can edit it either locally before uploading in Step 2, or directly on GitHub:
+   - In your repository on github.com, click `config.js`.
+   - Click the pencil (✎) **Edit this file** icon in the top-right of the file view.
+   - Replace the placeholder values:
 
-   ```js
-   const SUPABASE_URL = "https://abcdefgh.supabase.co";
-   const SUPABASE_ANON_KEY = "eyJ...your-anon-key...";
-   ```
+     ```js
+     const SUPABASE_URL = "https://abcdefgh.supabase.co";
+     const SUPABASE_ANON_KEY = "eyJ...your-anon-key...";
+     ```
+
+   - Scroll down, add a commit message like `Add Supabase project config`, and click **Commit changes** (committing straight to `main` is fine for this project).
 
    These two values are safe to commit — they are meant to be public. They only let the browser call your Edge Function, not read your secrets.
 
@@ -81,6 +90,19 @@ Quiz **results** are saved with `localStorage` directly in the student's browser
 ## Step 4 — Deploy the Edge Function and store your Gemini key as a secret
 
 The Edge Function lives in `supabase/functions/generate-quiz/index.ts`. This is the piece that keeps your Gemini API key secret.
+
+> **No terminal? Use the Supabase Dashboard instead.** Since you're working entirely from the browser, you can skip the CLI entirely:
+> 1. In your Supabase project, go to **Edge Functions** in the left sidebar → **Deploy a new function** → **Via editor** (or **Create a new function**).
+> 2. Name it exactly `generate-quiz`.
+> 3. Open `supabase/functions/generate-quiz/index.ts` on GitHub (click the file, then **Raw** to see plain text), select all, and copy it.
+> 4. Paste it into the Supabase dashboard's code editor for your new function, replacing the placeholder content.
+> 5. Click **Deploy**.
+> 6. Go to **Edge Functions → Secrets** (or **Project Settings → Edge Functions → Secrets**) and add a new secret named `GEMINI_API_KEY` with your Google AI Studio key as the value. Save.
+> 7. Under the function's settings, make sure **Enforce JWT Verification** is turned **off** — this matches the `verify_jwt = false` setting in `supabase/config.toml`, since the app calls the function without a logged-in user.
+>
+> That's it — skip straight to "Test the function directly" below. The CLI steps that follow are only needed if you'd rather work from a terminal.
+
+### CLI method (optional alternative)
 
 1. Install the Supabase CLI:
 
@@ -175,6 +197,9 @@ From now on, every `git push` to `main` automatically redeploys the site.
 
 **CORS errors in the browser console**
 - Make sure you deployed the function from this repo as-is — it already sends the required `Access-Control-Allow-Origin` headers.
+
+**Error like `"This model models/gemini-2.0-flash is no longer available"`**
+- Google periodically retires older Gemini models. Open `supabase/functions/generate-quiz/index.ts`, find the `GEMINI_MODEL` constant near the top, and update it to whatever current model name Google's error message (or the [models list](https://ai.google.dev/gemini-api/docs/models)) points you to — e.g. `gemini-3.6-flash`. Re-deploy the function afterward (redeploy via the Supabase Dashboard editor, or `supabase functions deploy generate-quiz` if using the CLI).
 
 **Gemini returns malformed JSON / no questions**
 - This is rare because the function requests structured JSON output, but if it happens, just retry — occasionally the model needs a second attempt for very obscure topics.
