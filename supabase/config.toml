@@ -1,7 +1,13 @@
 project_id = "your-project-ref"
 
-# The frontend calls this function directly with the public anon key,
+# The frontend calls these functions directly with the public anon key,
 # without a logged-in user session, so JWT verification is disabled.
-# The Gemini key itself is still fully protected as a server-side secret.
+# The Gemini keys themselves are still fully protected as server-side secrets.
 [functions.generate-quiz]
+verify_jwt = false
+
+[functions.generate-paper]
+verify_jwt = false
+
+[functions.evaluate-paper]
 verify_jwt = false

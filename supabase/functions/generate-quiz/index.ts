@@ -15,6 +15,9 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+// gemini-2.0-flash was retired in June 2026. gemini-3.6-flash is the
+// current stable model as of August 2026 (gemini-3.7-flash is newer
+// but still promotionally priced/rolling out — swap in if you prefer it).
 const GEMINI_MODEL = "gemini-3.6-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
