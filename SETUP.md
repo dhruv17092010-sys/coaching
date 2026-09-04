@@ -1,44 +1,59 @@
 # ChalkQuiz — Setup & Deployment Guide
 
-This guide walks you through deploying ChalkQuiz from zero to a live URL. It uses:
+This guide walks you through deploying ChalkQuiz from zero to a live URL. It now has two AI-powered modes:
+
+- **Practice Quiz** — multiple-choice quizzes by grade, topic, and difficulty (5/10/15/20 questions).
+- **Board Exam Simulator** — for students preparing for Indian board exams (CBSE/ICSE/State Board). The AI writes a subjective, hand-written-style question paper (10/15/20 marks) with an internal marking scheme, the student writes their answers on paper under a timer, photographs the answer sheet, and the AI grades it like a board examiner — with step marking and improvement notes.
+
+It uses:
 
 - **HTML / CSS / JavaScript** — the frontend (no framework, no build step)
-- **Google AI Studio (Gemini API)** — generates the quiz questions
-- **Supabase Edge Function** — a small server-side proxy that calls Gemini, so your API key is never exposed in the browser
+- **Google AI Studio (Gemini API)** — three separate API keys, one per AI task (see below)
+- **Supabase Edge Functions** — three small server-side proxies that call Gemini, so no API key is ever exposed in the browser
 - **GitHub** — stores your code
 - **Netlify** — hosts the static frontend and auto-deploys from GitHub
 
-**Total time:** ~20–30 minutes, no prior backend experience required.
+**Total time:** ~30–40 minutes, no prior backend experience required.
 
 ---
 
 ## Architecture overview
 
+Three independent Gemini API keys power three Edge Functions, matching the three distinct AI jobs in the app:
+
 ```
-Browser (index.html/app.js)
-        │  POST { topic, grade, difficulty, numQuestions }
-        ▼
-Supabase Edge Function (generate-quiz)
-        │  uses secret GEMINI_API_KEY (stored server-side only)
-        ▼
-Google Gemini API
-        │  returns quiz JSON
-        ▼
-Supabase Edge Function → Browser
+Practice Quiz
+Browser ──POST {topic, grade, difficulty, numQuestions}──▶ generate-quiz Edge Function
+                                                              (secret: GEMINI_API_KEY)
+                                                              ──▶ Gemini ──▶ MCQ quiz JSON ──▶ Browser
+
+Board Exam Simulator — step 1: set the paper
+Browser ──POST {subject, className, board, totalMarks}──▶ generate-paper Edge Function
+                                                              (secret: GEMINI_API_KEY_PAPER)
+                                                              ──▶ Gemini ──▶ questions + marking scheme ──▶ Browser
+                                                                                 (student writes on paper, timer runs)
+
+Board Exam Simulator — step 2: check the answer sheet
+Browser ──POST {questions, markingScheme, photo(s)}──▶ evaluate-paper Edge Function
+                                                              (secret: GEMINI_API_KEY_CHECKER)
+                                                              ──▶ Gemini Vision ──▶ marks + feedback ──▶ Browser
+                                                                 (or "photo unclear, please retake")
 ```
 
-The Gemini API key **never** appears in your HTML/JS, browser network tab, or GitHub repo. Only the Supabase project URL and the public "anon" key are in the frontend — those are designed to be public and only allow calling your function, nothing else.
+None of the three Gemini API keys ever appear in your HTML/JS, browser network tab, or GitHub repo. Only the Supabase project URL and the public "anon" key are in the frontend — those are designed to be public and only allow calling your functions, nothing else.
 
-Quiz **results** are saved with `localStorage` directly in the student's browser — no database needed for that part.
+**Why three separate keys instead of one?** Splitting quiz generation, paper generation, and answer-sheet grading across three keys keeps each feature's usage and quota independent — if one key gets rate-limited or you want to track costs per feature in Google AI Studio, the others keep working. If you'd rather keep it simple, you can reuse the same key value for all three secrets — the app works either way.
+
+All **results** (both practice quizzes and board exam attempts) are saved with `localStorage` directly in the student's browser — no database needed for that part.
 
 ---
 
-## Step 1 — Get a Google AI Studio (Gemini) API key
+## Step 1 — Get three Google AI Studio (Gemini) API keys
 
 1. Go to [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
 2. Sign in with a Google account.
-3. Click **Create API key** (choose "Create API key in new project" if you don't have one).
-4. Copy the key somewhere safe. You will paste it into Supabase in Step 4 — **not** into any file in this project.
+3. Click **Create API key** three times (you can create multiple keys in the same project, or use "Create API key in new project" for extra separation). Label them as you create them, e.g. `chalkquiz-quiz`, `chalkquiz-paper`, `chalkquiz-checker`, so you don't mix them up.
+4. Copy all three keys somewhere safe. You will paste them into Supabase in Step 4 — **not** into any file in this project.
 
 ---
 
@@ -50,15 +65,16 @@ Quiz **results** are saved with `localStorage` directly in the student's browser
    - `index.html`
    - `style.css`
    - `app.js`
+   - `board.js`
    - `config.js`
    - `netlify.toml`
    - `.gitignore`
    - `SETUP.md`
-   - the whole `supabase` folder (drag the folder itself — GitHub's uploader preserves the folder structure, so `supabase/functions/generate-quiz/index.ts` and `supabase/config.toml` will land in the right place)
+   - the whole `supabase` folder (drag the folder itself — GitHub's uploader preserves the folder structure, so `supabase/functions/generate-quiz/index.ts`, `supabase/functions/generate-paper/index.ts`, `supabase/functions/evaluate-paper/index.ts`, and `supabase/config.toml` will all land in the right place)
 
    > Tip: if your browser lets you select multiple items at once (folder + files together), do it in one drag so everything uploads together. Otherwise, upload the files first, then drag in the `supabase` folder separately — GitHub will merge it into the existing repo.
 4. Scroll down, add a commit message like `Initial commit: ChalkQuiz`, and click **Commit changes**.
-5. Refresh the repository page and confirm you see all the files, including the nested `supabase/functions/generate-quiz/index.ts`.
+5. Refresh the repository page and confirm you see all the files, including the three nested `index.ts` files under `supabase/functions/`.
 
 ---
 
@@ -83,24 +99,30 @@ Quiz **results** are saved with `localStorage` directly in the student's browser
 
    - Scroll down, add a commit message like `Add Supabase project config`, and click **Commit changes** (committing straight to `main` is fine for this project).
 
-   These two values are safe to commit — they are meant to be public. They only let the browser call your Edge Function, not read your secrets.
+   These two values are safe to commit — they are meant to be public. They only let the browser call your Edge Functions, not read your secrets. (`config.js` already includes the URLs for all three functions — `generate-quiz`, `generate-paper`, and `evaluate-paper` — you only need to fill in `SUPABASE_URL` and `SUPABASE_ANON_KEY`.)
 
 ---
 
-## Step 4 — Deploy the Edge Function and store your Gemini key as a secret
+## Step 4 — Deploy the three Edge Functions and store your Gemini keys as secrets
 
-The Edge Function lives in `supabase/functions/generate-quiz/index.ts`. This is the piece that keeps your Gemini API key secret.
+You now have three functions to deploy, each with its own secret:
 
-> **No terminal? Use the Supabase Dashboard instead.** Since you're working entirely from the browser, you can skip the CLI entirely:
-> 1. In your Supabase project, go to **Edge Functions** in the left sidebar → **Deploy a new function** → **Via editor** (or **Create a new function**).
-> 2. Name it exactly `generate-quiz`.
-> 3. Open `supabase/functions/generate-quiz/index.ts` on GitHub (click the file, then **Raw** to see plain text), select all, and copy it.
-> 4. Paste it into the Supabase dashboard's code editor for your new function, replacing the placeholder content.
-> 5. Click **Deploy**.
-> 6. Go to **Edge Functions → Secrets** (or **Project Settings → Edge Functions → Secrets**) and add a new secret named `GEMINI_API_KEY` with your Google AI Studio key as the value. Save.
-> 7. Under the function's settings, make sure **Enforce JWT Verification** is turned **off** — this matches the `verify_jwt = false` setting in `supabase/config.toml`, since the app calls the function without a logged-in user.
+| Function | Secret name | What it does |
+|---|---|---|
+| `generate-quiz` | `GEMINI_API_KEY` | Generates MCQ practice quizzes |
+| `generate-paper` | `GEMINI_API_KEY_PAPER` | Generates the board-exam question paper + marking scheme |
+| `evaluate-paper` | `GEMINI_API_KEY_CHECKER` | Grades the photographed answer sheet against the marking scheme |
+
+> **No terminal? Use the Supabase Dashboard.** Repeat these steps three times, once per function above:
+> 1. In your Supabase project, go to **Edge Functions** in the left sidebar → **Deploy a new function** → **Via editor**.
+> 2. Name it exactly as shown in the table (`generate-quiz`, `generate-paper`, or `evaluate-paper`).
+> 3. On GitHub, open the matching file — `supabase/functions/generate-quiz/index.ts`, `supabase/functions/generate-paper/index.ts`, or `supabase/functions/evaluate-paper/index.ts` — click **Raw**, select all, and copy it.
+> 4. Paste it into the Supabase dashboard's code editor for that function, replacing the placeholder content, then click **Deploy**.
+> 5. Under the function's settings, make sure **Enforce JWT Verification** is turned **off** for all three — this matches `verify_jwt = false` in `supabase/config.toml`, since the app calls these functions without a logged-in user.
 >
-> That's it — skip straight to "Test the function directly" below. The CLI steps that follow are only needed if you'd rather work from a terminal.
+> Once all three are deployed, go to **Edge Functions → Secrets** (or **Project Settings → Edge Functions → Secrets**) and add all three secrets from the table above, pasting in the matching Gemini API key from Step 1 for each. Save.
+>
+> That's it — skip straight to "Test the functions directly" below. The CLI steps that follow are only needed if you'd rather work from a terminal.
 
 ### CLI method (optional alternative)
 
@@ -121,23 +143,27 @@ The Edge Function lives in `supabase/functions/generate-quiz/index.ts`. This is 
 
    Your project ref is the subdomain part of your Project URL (e.g. `abcdefgh` from `https://abcdefgh.supabase.co`). You can also copy it from **Project Settings → General**.
 
-3. Store your Gemini API key as an encrypted secret (this is the step that keeps it out of your code entirely):
+3. Store all three Gemini API keys as encrypted secrets:
 
    ```bash
-   supabase secrets set GEMINI_API_KEY=your-gemini-api-key-here
+   supabase secrets set GEMINI_API_KEY=your-quiz-key-here
+   supabase secrets set GEMINI_API_KEY_PAPER=your-paper-key-here
+   supabase secrets set GEMINI_API_KEY_CHECKER=your-checker-key-here
    ```
 
-4. Deploy the function:
+4. Deploy all three functions:
 
    ```bash
    supabase functions deploy generate-quiz
+   supabase functions deploy generate-paper
+   supabase functions deploy evaluate-paper
    ```
 
-5. Confirm it deployed: in the Supabase dashboard, go to **Edge Functions** — you should see `generate-quiz` listed as active.
+5. Confirm they deployed: in the Supabase dashboard, go to **Edge Functions** — you should see all three listed as active.
 
-> The included `supabase/config.toml` sets `verify_jwt = false` for this function, since the quiz app calls it directly from the browser without a logged-in user. Your Gemini key is still fully protected — that setting only controls who can *call the function*, not who can see the secret inside it.
+> The included `supabase/config.toml` sets `verify_jwt = false` for all three functions, since the app calls them directly from the browser without a logged-in user. Your Gemini keys are still fully protected — that setting only controls who can *call the function*, not who can see the secrets inside it.
 
-### Test the function directly (optional but recommended)
+### Test the functions directly (optional but recommended)
 
 ```bash
 curl -X POST "https://YOUR-PROJECT-REF.supabase.co/functions/v1/generate-quiz" \
@@ -145,9 +171,15 @@ curl -X POST "https://YOUR-PROJECT-REF.supabase.co/functions/v1/generate-quiz" \
   -H "Authorization: Bearer YOUR-ANON-KEY" \
   -H "apikey: YOUR-ANON-KEY" \
   -d '{"topic":"Photosynthesis","grade":"Grade 7","difficulty":"Medium","numQuestions":5}'
+
+curl -X POST "https://YOUR-PROJECT-REF.supabase.co/functions/v1/generate-paper" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR-ANON-KEY" \
+  -H "apikey: YOUR-ANON-KEY" \
+  -d '{"subject":"Physics","className":"Class 10","board":"CBSE","totalMarks":15,"timerMinutes":23}'
 ```
 
-You should get back JSON like `{"questions":[{...}, ...]}`.
+You should get back JSON with a `questions` array in both cases. `evaluate-paper` is easiest to test from the app itself in Step 7, since it needs a real photo.
 
 ---
 
@@ -179,32 +211,51 @@ From now on, every `git push` to `main` automatically redeploys the site.
 
 ## Step 7 — Try it out
 
+**Practice Quiz:**
 1. Open your Netlify URL.
 2. Fill in a topic, grade, difficulty, and number of questions (5/10/15/20), set or disable the timer, and click **Generate quiz**.
 3. Answer the questions, submit, and view your score and answer review.
-4. Click **History** in the top nav — your past attempts are listed, pulled from `localStorage` on that device/browser.
+
+**Board Exam Simulator:**
+1. Click **Board Exam** in the top nav.
+2. Fill in a subject, class, board, and total marks (10/15/20), adjust the timer if you like, and click **Generate question paper**.
+3. Write your answers by hand on paper, numbering them to match the question numbers shown.
+4. When you're done (or the timer runs out), click **I'm done — upload answer sheet**, then photograph your page(s) in good light and submit.
+5. If a photo is too blurry or unreadable, the AI will ask you to retake it (up to 3 attempts) instead of guessing at your marks.
+6. Review your marks, examiner feedback, and question-by-question breakdown.
+
+Click **History** in the top nav for either mode — past attempts are listed under separate "Practice quizzes" / "Board exams" tabs, pulled from `localStorage` on that device/browser.
 
 ---
 
 ## Troubleshooting
 
-**"Couldn't generate a quiz right now" error in the app**
-- Open your browser's dev tools → Network tab, retry, and check the response from `generate-quiz`.
-- Common causes: `config.js` still has placeholder values, the Edge Function secret wasn't set, or the Gemini API key is invalid/over quota.
+**"Couldn't generate a quiz / question paper right now" error in the app**
+- Open your browser's dev tools → Network tab, retry, and check the response from `generate-quiz` or `generate-paper`.
+- Common causes: `config.js` still has placeholder values, the matching Edge Function secret wasn't set, or that Gemini API key is invalid/over quota.
+
+**"Couldn't check your answer sheet right now" error**
+- Check the `evaluate-paper` response in the Network tab. Common causes: `GEMINI_API_KEY_CHECKER` not set, the photo file was too large (see below), or a temporary Gemini API error — retrying usually works.
 
 **`supabase functions deploy` fails with an auth error**
 - Run `supabase login` again, and make sure `supabase link` used the correct project ref.
 
 **CORS errors in the browser console**
-- Make sure you deployed the function from this repo as-is — it already sends the required `Access-Control-Allow-Origin` headers.
+- Make sure you deployed the functions from this repo as-is — they already send the required `Access-Control-Allow-Origin` headers.
 
 **Error like `"This model models/gemini-2.0-flash is no longer available"`**
-- Google periodically retires older Gemini models. Open `supabase/functions/generate-quiz/index.ts`, find the `GEMINI_MODEL` constant near the top, and update it to whatever current model name Google's error message (or the [models list](https://ai.google.dev/gemini-api/docs/models)) points you to — e.g. `gemini-3.6-flash`. Re-deploy the function afterward (redeploy via the Supabase Dashboard editor, or `supabase functions deploy generate-quiz` if using the CLI).
+- Google periodically retires older Gemini models. Open the relevant `index.ts` file (`generate-quiz`, `generate-paper`, or `evaluate-paper`), find the `GEMINI_MODEL` constant near the top, and update it to whatever current model name Google's error message (or the [models list](https://ai.google.dev/gemini-api/docs/models)) points you to — e.g. `gemini-3.6-flash`. Re-deploy that function afterward.
 
 **Gemini returns malformed JSON / no questions**
-- This is rare because the function requests structured JSON output, but if it happens, just retry — occasionally the model needs a second attempt for very obscure topics.
+- This is rare because the functions request structured JSON output, but if it happens, just retry — occasionally the model needs a second attempt for very obscure topics.
 
-**Quiz history disappeared**
+**The AI keeps saying the photo is unclear**
+- Make sure the whole page is in frame, in good even light, with no shadows across the writing, and the phone held roughly parallel to the page. After 3 attempts the app grades with whatever it can read rather than looping forever, and flags any best-effort marks in the results.
+
+**Photo upload fails or times out**
+- Supabase Edge Functions have a request body size limit. The app already resizes photos client-side (max 1600px, JPEG ~80% quality) before upload to stay well under it, but very many high-resolution pages at once can still add up — try uploading 1–2 pages at a time if this happens, or lower `MAX_IMAGE_DIMENSION` in `board.js`.
+
+**Quiz or board exam history disappeared**
 - `localStorage` is per-browser and per-device. Clearing browser data, using a different browser, or private/incognito mode will not show old history. This is expected, since the app intentionally avoids storing student results in any external database.
 
 ---
@@ -213,25 +264,31 @@ From now on, every `git push` to `main` automatically redeploys the site.
 
 ```
 chalkquiz/
-├── index.html                          # App shell: setup, quiz, results, history screens
+├── index.html                          # App shell: all quiz + board exam screens
 ├── style.css                           # Chalkboard-themed styling
-├── app.js                              # Frontend logic, timer, scoring, localStorage
-├── config.js                           # Public Supabase URL + anon key (safe to expose)
+├── app.js                              # Practice quiz logic, shared nav/history helpers
+├── board.js                            # Board Exam Simulator: paper, timer, photo upload, grading
+├── config.js                           # Public Supabase URL + anon key + function endpoints
 ├── netlify.toml                        # Netlify hosting config
 ├── .gitignore
 ├── SETUP.md                            # You are here
 └── supabase/
     ├── config.toml                     # Edge Function auth settings
     └── functions/
-        └── generate-quiz/
-            └── index.ts                # Server-side proxy to Gemini (holds the secret key)
+        ├── generate-quiz/
+        │   └── index.ts                # MCQ practice quiz (secret: GEMINI_API_KEY)
+        ├── generate-paper/
+        │   └── index.ts                # Board exam paper + marking scheme (secret: GEMINI_API_KEY_PAPER)
+        └── evaluate-paper/
+            └── index.ts                # Photo grading against marking scheme (secret: GEMINI_API_KEY_CHECKER)
 ```
 
 ---
 
 ## Extending this project
 
-- **Add real user accounts:** enable Supabase Auth and store quiz results in a Postgres table instead of (or alongside) `localStorage`, so results follow the student across devices.
-- **Teacher dashboard:** create a Supabase table `quiz_results`, insert a row from the frontend after each quiz (using the anon key with row-level security scoped to the student's user id), and build a simple teacher view.
-- **Rate limiting:** add a check in the Edge Function (e.g. by IP or user id) to prevent abuse of your Gemini quota.
-- **More question types:** extend the Gemini prompt and schema in `index.ts` to support true/false or short-answer questions.
+- **Add real user accounts:** enable Supabase Auth and store quiz/board exam results in a Postgres table instead of (or alongside) `localStorage`, so results follow the student across devices.
+- **Teacher dashboard:** create Supabase tables for quiz and board exam results, insert a row from the frontend after each attempt (using the anon key with row-level security scoped to the student's user id), and build a simple teacher view — especially useful for board exam attempts, where a teacher may want to spot-check the AI's grading.
+- **Store the marking scheme server-side:** for this prototype, the marking scheme travels through the browser between paper generation and evaluation (kept in memory, never displayed). For a stricter setup, save it in a Supabase table keyed by a session id when `generate-paper` runs, and have `evaluate-paper` look it up server-side instead of trusting what the client sends back.
+- **Rate limiting:** add a check in the Edge Functions (e.g. by IP or user id) to prevent abuse of your Gemini quota — image grading calls are the most expensive of the three.
+- **More question types:** extend the Gemini prompts and schemas to support true/false, fill-in-the-blank, or diagram-based questions.

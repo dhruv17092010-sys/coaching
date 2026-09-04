@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ChalkQuiz · AI Quiz Generator</title>
+<title>ChalkQuiz · AI Study Partner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,500&family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -19,7 +19,8 @@
     <h1>ChalkQuiz<span class="brand-dot">.</span></h1>
   </div>
   <nav class="top-nav">
-    <button class="nav-link" id="nav-home" data-active="true">New Quiz</button>
+    <button class="nav-link" id="nav-home" data-active="true">Practice Quiz</button>
+    <button class="nav-link" id="nav-board">Board Exam</button>
     <button class="nav-link" id="nav-history">History</button>
   </nav>
 </header>
@@ -161,24 +162,188 @@
     <div class="review-list" id="review-list" hidden></div>
   </section>
 
+  <!-- ===================== BOARD EXAM: SETUP ===================== -->
+  <section id="screen-board-setup" class="screen" hidden>
+    <div class="hero">
+      <p class="eyebrow">board exam simulator</p>
+      <h2 class="hero-title">Write it on paper.<br/>Let AI mark it like an examiner.</h2>
+      <p class="hero-sub">Get a subjective question paper, write your answers by hand under a timer, then photograph your answer sheet for AI evaluation — CBSE/ICSE-style step marking included.</p>
+    </div>
+
+    <form id="board-form" class="quiz-card setup-card">
+      <div class="field">
+        <label for="board-subject">Subject</label>
+        <input type="text" id="board-subject" placeholder="e.g. Physics, History, Mathematics" required maxlength="60" />
+      </div>
+
+      <div class="field">
+        <label for="board-chapter">Chapter / topic <span class="label-optional">(optional)</span></label>
+        <input type="text" id="board-chapter" placeholder="e.g. Electromagnetic Induction" maxlength="80" />
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="board-class">Class</label>
+          <select id="board-class" required>
+            <option value="">Select class</option>
+            <option>Class 9</option>
+            <option>Class 10</option>
+            <option>Class 11</option>
+            <option>Class 12</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="board-type">Board</label>
+          <select id="board-type" required>
+            <option value="CBSE">CBSE</option>
+            <option value="ICSE">ICSE</option>
+            <option value="State Board">State Board</option>
+            <option value="General / Other">General / Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Total marks <span class="label-optional">(prototype limit: 10–20)</span></label>
+        <div class="chip-group" id="board-marks-group" role="radiogroup">
+          <button type="button" class="chip" data-value="10">10</button>
+          <button type="button" class="chip is-selected" data-value="15">15</button>
+          <button type="button" class="chip" data-value="20">20</button>
+        </div>
+        <input type="hidden" id="board-total-marks" value="15" />
+      </div>
+
+      <div class="field">
+        <label for="board-timer-minutes">Time limit (minutes)</label>
+        <input type="number" id="board-timer-minutes" min="5" max="90" value="23" />
+        <p class="field-hint" id="board-timer-hint">Suggested ~1.5 min per mark — feel free to adjust.</p>
+      </div>
+
+      <button type="submit" class="btn-primary" id="board-generate-btn">
+        <span class="btn-label">Generate question paper</span>
+      </button>
+
+      <p class="form-error" id="board-form-error" hidden></p>
+    </form>
+  </section>
+
+  <!-- ===================== BOARD EXAM: LOADING ===================== -->
+  <section id="screen-board-loading" class="screen" hidden>
+    <div class="loading-wrap">
+      <div class="chalk-spinner" aria-hidden="true"></div>
+      <p class="loading-text" id="board-loading-text">Setting the exam…</p>
+    </div>
+  </section>
+
+  <!-- ===================== BOARD EXAM: PAPER / WRITING ===================== -->
+  <section id="screen-board-paper" class="screen" hidden>
+    <div class="quiz-topbar">
+      <div class="quiz-meta">
+        <span id="board-paper-label">Subject · Class</span>
+        <span class="dot-sep">·</span>
+        <span id="board-paper-marks">15 marks</span>
+      </div>
+      <div class="timer-chip" id="board-timer-chip">
+        <span class="timer-dot"></span>
+        <span id="board-timer-display">23:00</span>
+      </div>
+    </div>
+
+    <div class="quiz-card paper-card">
+      <p class="paper-instructions">Write your answers on a notebook or ruled sheet as you normally would in an exam. Number each answer to match the question number below. When you're done (or time runs out), you'll photograph your answer sheet for grading.</p>
+      <div class="paper-questions" id="paper-questions"></div>
+    </div>
+
+    <div class="quiz-nav">
+      <button class="btn-primary" id="board-finish-btn">I'm done — upload answer sheet</button>
+    </div>
+  </section>
+
+  <!-- ===================== BOARD EXAM: UPLOAD ===================== -->
+  <section id="screen-board-upload" class="screen" hidden>
+    <div class="hero hero-compact">
+      <p class="eyebrow">answer sheet</p>
+      <h2 class="hero-title">Photograph your answers</h2>
+      <p class="hero-sub">Good lighting, flat page, whole page in frame. Add one photo per page if you wrote more than one.</p>
+    </div>
+
+    <div class="unclear-banner" id="unclear-banner" hidden>
+      <strong>Couldn't read this clearly.</strong>
+      <p id="unclear-message"></p>
+    </div>
+
+    <div class="quiz-card">
+      <label class="dropzone" for="answer-photos">
+        <span class="dropzone-icon" aria-hidden="true">＋</span>
+        <span class="dropzone-text">Tap to add photo(s) of your answer sheet</span>
+        <input type="file" id="answer-photos" accept="image/*" multiple capture="environment" hidden />
+      </label>
+      <div class="photo-grid" id="photo-grid"></div>
+      <button type="button" class="btn-primary" id="board-submit-photos-btn" disabled>Submit for checking</button>
+      <p class="form-error" id="board-upload-error" hidden></p>
+    </div>
+  </section>
+
+  <!-- ===================== BOARD EXAM: CHECKING ===================== -->
+  <section id="screen-board-checking" class="screen" hidden>
+    <div class="loading-wrap">
+      <div class="chalk-spinner" aria-hidden="true"></div>
+      <p class="loading-text" id="board-checking-text">Reading your handwriting…</p>
+    </div>
+  </section>
+
+  <!-- ===================== BOARD EXAM: RESULTS ===================== -->
+  <section id="screen-board-results" class="screen" hidden>
+    <div class="results-header">
+      <p class="eyebrow">examiner's report</p>
+      <h2 class="hero-title" id="board-results-title">Here's how you did</h2>
+      <div class="score-ring-wrap">
+        <svg viewBox="0 0 140 140" class="score-ring">
+          <circle cx="70" cy="70" r="60" class="ring-bg" />
+          <circle cx="70" cy="70" r="60" class="ring-fill" id="board-ring-fill" />
+        </svg>
+        <div class="score-ring-label">
+          <span id="board-score-fraction">0/15</span>
+          <span id="board-score-percent">0%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="quiz-card feedback-card" id="board-feedback-card"></div>
+
+    <div class="quiz-card">
+      <h3 class="section-heading">Question-wise breakdown</h3>
+      <div class="board-review-list" id="board-review-list"></div>
+    </div>
+
+    <div class="results-actions">
+      <button class="btn-primary" id="board-retake-btn">New paper</button>
+    </div>
+  </section>
+
   <!-- ===================== HISTORY SCREEN ===================== -->
   <section id="screen-history" class="screen" hidden>
     <div class="hero hero-compact">
       <p class="eyebrow">past attempts</p>
-      <h2 class="hero-title">Your quiz history</h2>
+      <h2 class="hero-title">Your history</h2>
       <p class="hero-sub">Stored right on this device — nothing leaves your browser.</p>
     </div>
+    <div class="history-tabs" id="history-tabs">
+      <button class="history-tab is-active" data-tab="quiz">Practice quizzes</button>
+      <button class="history-tab" data-tab="board">Board exams</button>
+    </div>
     <div class="history-list" id="history-list"></div>
-    <button class="btn-ghost btn-danger" id="clear-history-btn" hidden>Clear history</button>
+    <button class="btn-ghost btn-danger" id="clear-history-btn" hidden>Clear this history</button>
   </section>
 
 </main>
 
 <footer class="site-footer">
-  <p>ChalkQuiz — questions generated by AI, so always double-check the tricky ones.</p>
+  <p>ChalkQuiz — questions and grading generated by AI. Always double-check tricky answers with your teacher.</p>
 </footer>
 
 <script src="config.js"></script>
 <script src="app.js"></script>
+<script src="board.js"></script>
 </body>
 </html>

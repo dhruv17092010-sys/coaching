@@ -15,3 +15,7 @@ const SUPABASE_ANON_KEY = "sb_publishable__q3zDoPqiwHhpuhJhwP-ig_Yczrh0mZ";
 
 // Full URL of the deployed Edge Function that talks to Gemini.
 const GENERATE_QUIZ_ENDPOINT = `${SUPABASE_URL}/functions/v1/generate-quiz`;
+
+// Board Exam Simulator endpoints (see SETUP.md, "Board Exam Simulator" section).
+const GENERATE_PAPER_ENDPOINT = `${SUPABASE_URL}/functions/v1/generate-paper`;
+const EVALUATE_PAPER_ENDPOINT = `${SUPABASE_URL}/functions/v1/evaluate-paper`;

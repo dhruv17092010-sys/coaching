@@ -10,8 +10,6 @@ const LOADING_LINES = [
   "Double-checking the answer key…",
 ];
 
-const STORAGE_KEY = "chalkquiz_history";
-
 /** @typedef {{question:string, options:string[], correctIndex:number, explanation:string}} QuizQuestion */
 
 const state = {
@@ -22,6 +20,7 @@ const state = {
   meta: { topic: "", grade: "", difficulty: "", numQuestions: 10, timerEnabled: true, timerMinutes: 10 },
   timer: { totalSeconds: 0, remainingSeconds: 0, intervalId: null, startedAt: null },
   reviewOpen: false,
+  historyTab: "quiz",
 };
 
 // ---------------------------------------------------------------
@@ -35,7 +34,16 @@ const screens = {
   quiz: el("screen-quiz"),
   results: el("screen-results"),
   history: el("screen-history"),
+  boardSetup: el("screen-board-setup"),
+  boardLoading: el("screen-board-loading"),
+  boardPaper: el("screen-board-paper"),
+  boardUpload: el("screen-board-upload"),
+  boardChecking: el("screen-board-checking"),
+  boardResults: el("screen-board-results"),
 };
+
+const QUIZ_SECTION_SCREENS = new Set(["setup", "loading", "quiz", "results"]);
+const BOARD_SECTION_SCREENS = new Set(["boardSetup", "boardLoading", "boardPaper", "boardUpload", "boardChecking", "boardResults"]);
 
 function showScreen(name) {
   Object.values(screens).forEach((s) => (s.hidden = true));
@@ -43,7 +51,8 @@ function showScreen(name) {
   state.screen = name;
   window.scrollTo({ top: 0, behavior: "smooth" });
 
-  el("nav-home").dataset.active = String(name === "setup" || name === "quiz" || name === "loading" || name === "results");
+  el("nav-home").dataset.active = String(QUIZ_SECTION_SCREENS.has(name));
+  el("nav-board").dataset.active = String(BOARD_SECTION_SCREENS.has(name));
   el("nav-history").dataset.active = String(name === "history");
 }
 
@@ -374,67 +383,86 @@ el("retake-btn").addEventListener("click", () => {
 // ---------------------------------------------------------------
 // localStorage history
 // ---------------------------------------------------------------
-function getHistory() {
+const STORAGE_KEYS = {
+  quiz: "chalkquiz_history",
+  board: "chalkquiz_board_history",
+};
+
+function getHistory(type = "quiz") {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEYS[type]);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-function saveResultToHistory(result) {
-  const history = getHistory();
+function saveResultToHistory(result, type = "quiz") {
+  const history = getHistory(type);
   history.unshift(result);
   // Keep the most recent 50 attempts so localStorage doesn't grow unbounded
   const trimmed = history.slice(0, 50);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+    localStorage.setItem(STORAGE_KEYS[type], JSON.stringify(trimmed));
   } catch (err) {
-    console.warn("Could not save quiz result to localStorage:", err);
+    console.warn("Could not save result to localStorage:", err);
   }
 }
 
-function renderHistory() {
-  const history = getHistory();
+function renderHistory(type = "quiz") {
+  const history = getHistory(type);
   const list = el("history-list");
   const clearBtn = el("clear-history-btn");
 
   if (!history.length) {
-    list.innerHTML = `<p class="empty-state">No quizzes yet — take one and it'll show up here.</p>`;
+    list.innerHTML = `<p class="empty-state">${
+      type === "quiz" ? "No quizzes yet — take one and it'll show up here." : "No board exam attempts yet — try one from the Board Exam tab."
+    }</p>`;
     clearBtn.hidden = true;
     return;
   }
 
   clearBtn.hidden = false;
+  clearBtn.dataset.type = type;
   list.innerHTML = "";
   history.forEach((r) => {
     const item = document.createElement("div");
     item.className = "history-item";
     const date = new Date(r.date);
+    const subtitle =
+      type === "quiz"
+        ? `${escapeHtml(r.grade)} · ${escapeHtml(r.difficulty)} · ${r.numQuestions} questions`
+        : `${escapeHtml(r.className)} · ${escapeHtml(r.board)} · ${r.totalMarks} marks`;
     item.innerHTML = `
       <div class="history-item-main">
         <p class="history-topic">${escapeHtml(r.topic)}</p>
-        <p class="history-meta">${escapeHtml(r.grade)} · ${escapeHtml(r.difficulty)} · ${r.numQuestions} questions · ${date.toLocaleDateString()} ${date.toLocaleTimeString(
-      [],
-      { hour: "2-digit", minute: "2-digit" }
-    )}</p>
+        <p class="history-meta">${subtitle} · ${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}</p>
       </div>
       <div class="history-score">${r.percent}%</div>
     `;
     item.style.cursor = "pointer";
     item.addEventListener("click", () => {
-      renderResults(r);
-      showScreen("results");
+      if (type === "quiz") {
+        renderResults(r);
+        showScreen("results");
+      } else {
+        renderBoardResults(r);
+        showScreen("boardResults");
+      }
     });
     list.appendChild(item);
   });
 }
 
 el("clear-history-btn").addEventListener("click", () => {
-  if (confirm("Clear all saved quiz history on this device? This can't be undone.")) {
-    localStorage.removeItem(STORAGE_KEY);
-    renderHistory();
+  const type = el("clear-history-btn").dataset.type || "quiz";
+  const label = type === "quiz" ? "practice quiz" : "board exam";
+  if (confirm(`Clear all saved ${label} history on this device? This can't be undone.`)) {
+    localStorage.removeItem(STORAGE_KEYS[type]);
+    renderHistory(type);
   }
 });
 
@@ -442,9 +470,19 @@ el("clear-history-btn").addEventListener("click", () => {
 // Navigation
 // ---------------------------------------------------------------
 el("nav-home").addEventListener("click", () => showScreen("setup"));
+el("nav-board").addEventListener("click", () => showScreen("boardSetup"));
 el("nav-history").addEventListener("click", () => {
-  renderHistory();
+  renderHistory(state.historyTab || "quiz");
   showScreen("history");
+});
+
+el("history-tabs").addEventListener("click", (e) => {
+  const btn = e.target.closest(".history-tab");
+  if (!btn) return;
+  document.querySelectorAll(".history-tab").forEach((t) => t.classList.remove("is-active"));
+  btn.classList.add("is-active");
+  state.historyTab = btn.dataset.tab;
+  renderHistory(state.historyTab);
 });
 
 // ---------------------------------------------------------------
