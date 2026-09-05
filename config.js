@@ -19,3 +19,4 @@ const GENERATE_QUIZ_ENDPOINT = `${SUPABASE_URL}/functions/v1/generate-quiz`;
 // Board Exam Simulator endpoints (see SETUP.md, "Board Exam Simulator" section).
 const GENERATE_PAPER_ENDPOINT = `${SUPABASE_URL}/functions/v1/generate-paper`;
 const EVALUATE_PAPER_ENDPOINT = `${SUPABASE_URL}/functions/v1/evaluate-paper`;
+const REPORT_VIOLATION_ENDPOINT = `${SUPABASE_URL}/functions/v1/report-violation`;

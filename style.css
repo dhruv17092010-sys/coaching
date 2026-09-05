@@ -858,3 +858,163 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 @media (max-width: 560px) {
   .photo-grid { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); }
 }
+
+/* ==========================================================
+   Board Exam Simulator v2 — sections, anti-cheat, backoff
+   ========================================================== */
+
+.proctor-notice {
+  background: rgba(232,163,61,0.08);
+  border: 1px solid rgba(232,163,61,0.3);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  font-size: 13.5px;
+  color: var(--chalk-200);
+  line-height: 1.55;
+  margin: -4px 0 22px;
+}
+
+.proctor-notice strong { color: var(--gold-400); }
+
+/* topbar chip cluster (warnings + timer) */
+
+.topbar-chips { display: flex; align-items: center; gap: 8px; }
+
+.warnings-chip {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--chalk-muted);
+  background: var(--board-700);
+  border: 1px solid rgba(246,244,236,0.14);
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+
+.warnings-chip.is-low { color: var(--coral-500); border-color: rgba(230,104,92,0.4); }
+
+/* fullscreen-gate + warning overlays */
+
+.paper-start-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15,38,32,0.92);
+  backdrop-filter: blur(2px);
+}
+
+.paper-start-card {
+  max-width: 440px;
+  width: 100%;
+  margin-top: 0;
+  text-align: left;
+}
+
+.paper-start-title { font-size: 24px; margin-bottom: 16px; }
+
+.paper-start-rules {
+  margin: 0 0 22px;
+  padding-left: 20px;
+  color: var(--chalk-200);
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+
+.paper-start-rules strong { color: var(--gold-400); }
+
+.violation-card .eyebrow { color: var(--coral-500); }
+
+/* sectioned paper */
+
+.paper-section-heading {
+  margin: 28px 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgba(232,163,61,0.3);
+}
+
+.paper-section-heading:first-child { margin-top: 0; }
+
+.paper-section-heading h3 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--gold-400);
+  margin: 0 0 4px;
+}
+
+.paper-section-heading p {
+  font-size: 13px;
+  color: var(--chalk-muted);
+  margin: 0;
+}
+
+.paper-passage {
+  background: var(--board-700);
+  border-left: 3px solid var(--gold-500);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 14.5px;
+  font-style: italic;
+  color: var(--chalk-200);
+  line-height: 1.6;
+  margin-bottom: 12px;
+  white-space: pre-line;
+}
+
+.paper-question .question-text { white-space: pre-line; }
+
+.mcq-options { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+
+.mcq-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  color: var(--chalk-200);
+}
+
+.mcq-option .option-letter {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* photo reorder controls */
+
+.photo-controls {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.photo-move {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border: none;
+  background: rgba(15,38,32,0.75);
+  color: var(--chalk-100);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.photo-move:hover:not(:disabled) { background: var(--gold-500); color: var(--board-900); }
+.photo-move:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.review-section-heading {
+  color: var(--gold-400);
+  margin: 4px 0 -4px;
+}
+
+@media (max-width: 560px) {
+  .paper-start-card { padding: 24px 20px; }
+}
