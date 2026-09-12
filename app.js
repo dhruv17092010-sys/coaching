@@ -10,6 +10,53 @@ const LOADING_LINES = [
   "Double-checking the answer key…",
 ];
 
+// ---------------------------------------------------------------
+// Shared: fetch with exponential backoff
+// ---------------------------------------------------------------
+// Retries on transient server errors (503 "server overloaded" is the
+// most common one from busy AI APIs, plus 429/502/504) using
+// exponential backoff with jitter. Used by every network call in the
+// app (app.js and board.js) so a busy moment on Google's side doesn't
+// immediately fail the student's request.
+const RETRYABLE_STATUS_CODES = [429, 502, 503, 504];
+
+/**
+ * @param {string} url
+ * @param {RequestInit} options
+ * @param {{maxRetries?:number, baseDelayMs?:number, maxDelayMs?:number, onRetry?:(info:{attempt:number,maxRetries:number,delayMs:number,reason:string})=>void}} [config]
+ */
+async function fetchWithRetry(url, options, config = {}) {
+  const { maxRetries = 5, baseDelayMs = 1000, maxDelayMs = 20000, onRetry } = config;
+  let attempt = 0;
+
+  while (true) {
+    let res;
+    let networkError = null;
+    try {
+      res = await fetch(url, options);
+    } catch (err) {
+      networkError = err;
+    }
+
+    const shouldRetry =
+      attempt < maxRetries && (networkError !== null || (res && RETRYABLE_STATUS_CODES.includes(res.status)));
+
+    if (!shouldRetry) {
+      if (networkError) throw networkError;
+      return res;
+    }
+
+    const delayMs = Math.min(maxDelayMs, baseDelayMs * 2 ** attempt);
+    const jitteredDelayMs = Math.round(delayMs * (0.5 + Math.random() * 0.5));
+    const reason = networkError ? "Network error" : `Server responded ${res.status}`;
+
+    attempt += 1;
+    if (onRetry) onRetry({ attempt, maxRetries, delayMs: jitteredDelayMs, reason });
+
+    await new Promise((resolve) => setTimeout(resolve, jitteredDelayMs));
+  }
+}
+
 /** @typedef {{question:string, options:string[], correctIndex:number, explanation:string}} QuizQuestion */
 
 const state = {
@@ -40,10 +87,19 @@ const screens = {
   boardUpload: el("screen-board-upload"),
   boardChecking: el("screen-board-checking"),
   boardResults: el("screen-board-results"),
+  boardCancelled: el("screen-board-cancelled"),
 };
 
 const QUIZ_SECTION_SCREENS = new Set(["setup", "loading", "quiz", "results"]);
-const BOARD_SECTION_SCREENS = new Set(["boardSetup", "boardLoading", "boardPaper", "boardUpload", "boardChecking", "boardResults"]);
+const BOARD_SECTION_SCREENS = new Set([
+  "boardSetup",
+  "boardLoading",
+  "boardPaper",
+  "boardUpload",
+  "boardChecking",
+  "boardResults",
+  "boardCancelled",
+]);
 
 function showScreen(name) {
   Object.values(screens).forEach((s) => (s.hidden = true));
@@ -115,20 +171,30 @@ async function generateQuiz() {
   }, 1800);
 
   try {
-    const res = await fetch(GENERATE_QUIZ_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        apikey: SUPABASE_ANON_KEY,
+    const res = await fetchWithRetry(
+      GENERATE_QUIZ_ENDPOINT,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          topic: state.meta.topic,
+          grade: state.meta.grade,
+          difficulty: state.meta.difficulty,
+          numQuestions: state.meta.numQuestions,
+        }),
       },
-      body: JSON.stringify({
-        topic: state.meta.topic,
-        grade: state.meta.grade,
-        difficulty: state.meta.difficulty,
-        numQuestions: state.meta.numQuestions,
-      }),
-    });
+      {
+        onRetry: ({ attempt, maxRetries, delayMs, reason }) => {
+          el("loading-text").textContent = `Server's busy (${reason}) — retrying in ${Math.round(
+            delayMs / 1000
+          )}s… (${attempt}/${maxRetries})`;
+        },
+      }
+    );
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");

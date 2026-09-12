@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.evaluate-paper]
 verify_jwt = false
+
+[functions.report-violation]
+verify_jwt = false

@@ -204,19 +204,26 @@
       </div>
 
       <div class="field">
-        <label>Total marks <span class="label-optional">(prototype limit: 10–20)</span></label>
+        <label>Total marks</label>
         <div class="chip-group" id="board-marks-group" role="radiogroup">
           <button type="button" class="chip" data-value="10">10</button>
-          <button type="button" class="chip is-selected" data-value="15">15</button>
-          <button type="button" class="chip" data-value="20">20</button>
+          <button type="button" class="chip is-selected" data-value="20">20</button>
+          <button type="button" class="chip" data-value="40">40</button>
+          <button type="button" class="chip" data-value="50">50</button>
+          <button type="button" class="chip" data-value="70">70</button>
+          <button type="button" class="chip" data-value="80">80</button>
         </div>
-        <input type="hidden" id="board-total-marks" value="15" />
+        <input type="hidden" id="board-total-marks" value="20" />
       </div>
 
       <div class="field">
         <label for="board-timer-minutes">Time limit (minutes)</label>
-        <input type="number" id="board-timer-minutes" min="5" max="90" value="23" />
-        <p class="field-hint" id="board-timer-hint">Suggested ~1.5 min per mark — feel free to adjust.</p>
+        <input type="number" id="board-timer-minutes" min="5" max="240" value="40" />
+        <p class="field-hint" id="board-timer-hint">Suggested ~2 min per mark — feel free to adjust.</p>
+      </div>
+
+      <div class="proctor-notice">
+        <strong>Exam integrity mode:</strong> once you start, the exam runs in full-screen. Leaving full-screen, switching tabs/apps, or trying to close this tab counts as a violation. After 2 violations, the paper is automatically cancelled — this is enforced on our server, not just in your browser.
       </div>
 
       <button type="submit" class="btn-primary" id="board-generate-btn">
@@ -243,9 +250,36 @@
         <span class="dot-sep">·</span>
         <span id="board-paper-marks">15 marks</span>
       </div>
-      <div class="timer-chip" id="board-timer-chip">
-        <span class="timer-dot"></span>
-        <span id="board-timer-display">23:00</span>
+      <div class="topbar-chips">
+        <span class="warnings-chip" id="board-warnings-chip" hidden>Warnings: 0/2</span>
+        <div class="timer-chip" id="board-timer-chip">
+          <span class="timer-dot"></span>
+          <span id="board-timer-display">23:00</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="paper-start-overlay" id="paper-start-overlay">
+      <div class="quiz-card paper-start-card">
+        <p class="eyebrow">before you begin</p>
+        <h3 class="hero-title paper-start-title">This exam runs in full-screen</h3>
+        <ul class="paper-start-rules">
+          <li>Leaving full-screen counts as a violation.</li>
+          <li>Switching tabs/apps or losing window focus counts as a violation.</li>
+          <li>Trying to close or reload this tab counts as a violation.</li>
+          <li>After <strong>2 violations</strong>, your paper is automatically cancelled — enforced on our server.</li>
+        </ul>
+        <button type="button" class="btn-primary" id="paper-start-btn">Start exam in full-screen</button>
+        <p class="form-error" id="paper-start-error" hidden></p>
+      </div>
+    </div>
+
+    <div class="paper-start-overlay" id="violation-warning-overlay" hidden>
+      <div class="quiz-card paper-start-card violation-card">
+        <p class="eyebrow" id="violation-warning-eyebrow">warning 1 of 2</p>
+        <h3 class="hero-title paper-start-title">Integrity warning</h3>
+        <p class="hero-sub" id="violation-warning-message"></p>
+        <button type="button" class="btn-primary" id="violation-warning-continue-btn">Continue exam</button>
       </div>
     </div>
 
@@ -259,12 +293,25 @@
     </div>
   </section>
 
+  <!-- ===================== BOARD EXAM: CANCELLED ===================== -->
+  <section id="screen-board-cancelled" class="screen" hidden>
+    <div class="hero">
+      <p class="eyebrow">exam integrity</p>
+      <h2 class="hero-title">This paper was cancelled</h2>
+      <p class="hero-sub" id="board-cancelled-reason">You received 2 integrity warnings during this exam, so it has been cancelled and cannot be submitted for grading.</p>
+    </div>
+    <div class="quiz-card">
+      <p class="explanation" style="margin-top:0;border-top:none;padding-top:0;">This decision is recorded on our server and can't be reversed from this device. If you believe this was a mistake — for example, your browser or OS triggered a false alarm — let your teacher know.</p>
+      <button type="button" class="btn-primary" id="board-cancelled-retry-btn" style="margin-top:16px;">Start a new paper</button>
+    </div>
+  </section>
+
   <!-- ===================== BOARD EXAM: UPLOAD ===================== -->
   <section id="screen-board-upload" class="screen" hidden>
     <div class="hero hero-compact">
       <p class="eyebrow">answer sheet</p>
       <h2 class="hero-title">Photograph your answers</h2>
-      <p class="hero-sub">Good lighting, flat page, whole page in frame. Add one photo per page if you wrote more than one.</p>
+      <p class="hero-sub">Good lighting, flat page, whole page in frame. Add photos in the order you wrote them — Page 1 first, then Page 2, and so on. You can reorder them below if needed.</p>
     </div>
 
     <div class="unclear-banner" id="unclear-banner" hidden>
