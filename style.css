@@ -31,6 +31,17 @@
 
 * { box-sizing: border-box; }
 
+/* The HTML `hidden` attribute is how this app shows/hides screens and
+   overlays. By default, an author stylesheet rule that sets `display`
+   on a matching element (e.g. `.paper-start-overlay { display: flex }`)
+   overrides the browser's built-in `[hidden]{display:none}` rule, even
+   though it has lower specificity — the CSS cascade resolves by origin
+   (author beats user-agent) before specificity. This single rule
+   guarantees `hidden` always wins, everywhere in the app. */
+[hidden] {
+  display: none !important;
+}
+
 html, body {
   margin: 0;
   padding: 0;

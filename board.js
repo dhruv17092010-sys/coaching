@@ -231,12 +231,21 @@ el("paper-start-btn").addEventListener("click", async () => {
   el("board-warnings-chip").hidden = boardState.sessionId ? false : true;
   updateWarningsChip();
 
-  armViolationMonitor();
-  startBoardTimer(boardState.meta.timerMinutes * 60);
+  // Entering full-screen causes a brief, harmless window blur/visibility
+  // blip in most browsers (part of the "Press Esc to exit" transition
+  // animation). Wait for that to settle before arming the monitor, so the
+  // transition itself is never mistaken for a violation.
+  setTimeout(() => {
+    armViolationMonitor();
+    startBoardTimer(boardState.meta.timerMinutes * 60);
+  }, 500);
 });
 
 el("violation-warning-continue-btn").addEventListener("click", () => {
   el("violation-warning-overlay").hidden = true;
+  // Re-entering full-screen here causes the same brief transition blip —
+  // push the cooldown window forward so it isn't immediately re-flagged.
+  lastViolationAt = Date.now();
   if (!isFullscreen()) requestFullscreenSafe().catch(() => {});
 });
 
@@ -304,6 +313,10 @@ let lastViolationAt = 0;
 
 function armViolationMonitor() {
   monitorArmed = true;
+  // Extra safety margin on top of the setTimeout delay in paper-start-btn's
+  // handler: anything that fires in the next VIOLATION_COOLDOWN_MS is
+  // treated as part of the same "just started" moment, not a new violation.
+  lastViolationAt = Date.now();
   document.addEventListener("fullscreenchange", onFullscreenChange);
   document.addEventListener("webkitfullscreenchange", onFullscreenChange);
   document.addEventListener("visibilitychange", onVisibilityChange);
